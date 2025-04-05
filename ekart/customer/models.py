@@ -23,6 +23,14 @@ class Product(models.Model):
     def __str__(self):
         return self.name
 
+# ✅ NEW MODEL FOR STORING IMAGE LINKS
+class ProductImage(models.Model):
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='images')
+    image_url = models.URLField()
+
+    def __str__(self):
+        return f"{self.product.name} Image"
+
 class Order(models.Model):
     STATUS_CHOICES = [
         ('pending', 'Pending'),
@@ -30,7 +38,7 @@ class Order(models.Model):
         ('delivered', 'Delivered'),
     ]
     
-    user = models.ForeignKey(UserCustomer, on_delete=models.CASCADE)  # Updated foreign key
+    user = models.ForeignKey(UserCustomer, on_delete=models.CASCADE)
     total_amount = models.DecimalField(max_digits=10, decimal_places=2, null=False)
     date = models.DateTimeField(auto_now_add=True)
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
@@ -41,7 +49,7 @@ class Order(models.Model):
         return f"Order {self.id} - {self.user.name}"
 
 class Cart(models.Model):
-    user = models.ForeignKey(UserCustomer, on_delete=models.CASCADE)  # Updated foreign key
+    user = models.ForeignKey(UserCustomer, on_delete=models.CASCADE)
     product = models.ForeignKey(Product, on_delete=models.CASCADE)
     quantity = models.IntegerField(default=1)
 
@@ -49,7 +57,7 @@ class Cart(models.Model):
         return f"{self.user.name} - {self.product.name} ({self.quantity})"
 
 class Review(models.Model):
-    user = models.ForeignKey(UserCustomer, on_delete=models.CASCADE)  # Updated foreign key
+    user = models.ForeignKey(UserCustomer, on_delete=models.CASCADE)
     product = models.ForeignKey(Product, on_delete=models.CASCADE)
     rating = models.DecimalField(max_digits=2, decimal_places=1)
     comment = models.TextField(null=True, blank=True)
@@ -59,7 +67,7 @@ class Review(models.Model):
         return f"{self.user.name} - {self.product.name} ({self.rating})"
 
 class Wishlist(models.Model):
-    user = models.ForeignKey(UserCustomer, on_delete=models.CASCADE)  # Updated foreign key
+    user = models.ForeignKey(UserCustomer, on_delete=models.CASCADE)
     product = models.ForeignKey(Product, on_delete=models.CASCADE)
 
     def __str__(self):
