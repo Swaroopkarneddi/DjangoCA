@@ -23,7 +23,6 @@ class Product(models.Model):
     def __str__(self):
         return self.name
 
-# ✅ NEW MODEL FOR STORING IMAGE LINKS
 class ProductImage(models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='images')
     image_url = models.URLField()

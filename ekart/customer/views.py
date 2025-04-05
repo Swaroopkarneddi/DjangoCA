@@ -68,3 +68,40 @@ def add_product(request):
 
     serializer = ProductSerializer(product)
     return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+@api_view(['POST'])
+def add_review(request, product_id):
+    try:
+        product = Product.objects.get(id=product_id)
+    except Product.DoesNotExist:
+        return Response({'error': 'Product not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    data = request.data
+    try:
+        user = UserCustomer.objects.get(id=data['userId'])
+    except UserCustomer.DoesNotExist:
+        return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    review = Review.objects.create(
+        user=user,
+        product=product,
+        rating=data['rating'],
+        comment=data.get('comment', ''),
+        date=data.get('date')
+    )
+
+    serializer = ReviewSerializer(review)
+    return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+@api_view(['GET'])
+def get_reviews(request, product_id):
+    try:
+        product = Product.objects.get(id=product_id)
+    except Product.DoesNotExist:
+        return Response({'error': 'Product not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    reviews = product.review_set.all()
+    serializer = ReviewSerializer(reviews, many=True)
+    return Response(serializer.data)
