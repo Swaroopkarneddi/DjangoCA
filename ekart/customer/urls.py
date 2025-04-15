@@ -41,11 +41,12 @@ urlpatterns = [
     # Orders
     path('api/orders/', views.order_list_create),
     path('api/orders/<int:order_id>/', views.order_update_delete),
-    path('orders/user/<int:user_id>/', views.user_orders),
 
 
     # Order Items
     path('api/orders/<int:order_id>/items/', views.get_order_items),
     path('api/order-items/<int:item_id>/', views.update_delete_order_item),
+
+    path('api/user/<int:user_id>/orders/', views.user_orders),
 
 ]
