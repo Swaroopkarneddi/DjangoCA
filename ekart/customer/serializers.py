@@ -1,5 +1,8 @@
 from rest_framework import serializers
-from .models import Product, ProductImage, Review, UserCustomer
+from .models import (
+    Product, ProductImage, Review, UserCustomer,
+    Cart, Wishlist, Order, OrderItem
+)
 
 class UserCustomerSerializer(serializers.ModelSerializer):
     class Meta:
@@ -34,3 +37,28 @@ class ProductSerializer(serializers.ModelSerializer):
         if not reviews:
             return 0
         return round(sum([r.rating for r in reviews]) / len(reviews), 1)
+
+class CartSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Cart
+        fields = '__all__'
+
+class WishlistSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Wishlist
+        fields = '__all__'
+
+class OrderItemSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = OrderItem
+        fields = '__all__'
+
+class OrderSerializer(serializers.ModelSerializer):
+    items = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Order
+        fields = ['id', 'user', 'total_amount', 'date', 'status', 'address', 'payment_method', 'items']
+
+    def get_items(self, obj):
+        return OrderItemSerializer(obj.orderitem_set.all(), many=True).data
