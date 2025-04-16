@@ -219,6 +219,66 @@ def cart_update_delete(request, cart_id):
         cart.delete()
         return Response({'message': 'Cart item deleted'})
 
+@api_view(['POST'])
+def add_to_cart(request, user_id):
+    product_id = request.data.get('product_id')
+    quantity = request.data.get('quantity', 1)
+
+    try:
+        user = UserCustomer.objects.get(id=user_id)
+        product = Product.objects.get(id=product_id)
+    except (UserCustomer.DoesNotExist, Product.DoesNotExist):
+        return Response({'error': 'Invalid user or product'}, status=404)
+
+    # Check if product already exists in cart
+    cart_item, created = Cart.objects.get_or_create(user=user, product=product)
+    if not created:
+        cart_item.quantity += int(quantity)
+    else:
+        cart_item.quantity = int(quantity)
+    cart_item.save()
+
+    return Response(CartSerializer(cart_item).data, status=201)
+
+@api_view(['GET'])
+def get_user_cart(request, user_id):
+    cart_items = Cart.objects.filter(user_id=user_id)
+    serializer = CartSerializer(cart_items, many=True)
+    return Response(serializer.data)
+
+@api_view(['DELETE'])
+def delete_cart_item(request, user_id, product_id):
+    try:
+        cart_item = Cart.objects.get(user_id=user_id, product_id=product_id)
+        cart_item.delete()
+        return Response({'message': 'Item removed from cart'}, status=200)
+    except Cart.DoesNotExist:
+        return Response({'error': 'Item not found in cart'}, status=404)
+
+@api_view(['PUT'])
+def update_cart_quantity(request, user_id, product_id):
+    try:
+        cart_item = Cart.objects.get(user_id=user_id, product_id=product_id)
+        quantity = request.data.get('quantity')
+        if quantity is not None and int(quantity) > 0:
+            cart_item.quantity = int(quantity)
+            cart_item.save()
+            return Response(CartSerializer(cart_item).data)
+        else:
+            return Response({'error': 'Invalid quantity'}, status=400)
+    except Cart.DoesNotExist:
+        return Response({'error': 'Cart item not found'}, status=404)
+
+@api_view(['DELETE'])
+def clear_user_cart(request, user_id):
+    cart_items = Cart.objects.filter(user_id=user_id)
+    if cart_items.exists():
+        cart_items.delete()
+        return Response({'message': 'All items removed from cart'}, status=200)
+    else:
+        return Response({'message': 'Cart is already empty'}, status=200)
+
+
 # -------------------- Wishlist --------------------
 
 @api_view(['GET'])
@@ -254,27 +314,6 @@ def add_to_wishlist(request, user_id):
     wishlist = Wishlist.objects.create(user=user, product=product)
     return Response(WishlistSerializer(wishlist).data, status=201)
 
-
-# @api_view(['GET', 'POST'])
-# def wishlist_list_create(request):
-#     if request.method == 'GET':
-#         wish = Wishlist.objects.all()
-#         return Response(WishlistSerializer(wish, many=True).data)
-#     elif request.method == 'POST':
-#         serializer = WishlistSerializer(data=request.data)
-#         if serializer.is_valid():
-#             serializer.save()
-#             return Response(serializer.data, status=201)
-#         return Response(serializer.errors, status=400)
-
-# @api_view(['DELETE'])
-# def delete_wishlist_item(request, wishlist_id):
-#     try:
-#         wish = Wishlist.objects.get(id=wishlist_id)
-#         wish.delete()
-#         return Response({'message': 'Wishlist item deleted'})
-#     except Wishlist.DoesNotExist:
-#         return Response({'error': 'Wishlist item not found'}, status=404)
 
 @api_view(['DELETE'])
 def delete_wishlist_item(request):
@@ -313,19 +352,26 @@ def order_list_create(request):
 
         return Response(OrderSerializer(order).data, status=201)
 
-@api_view(['PUT', 'DELETE'])
+@api_view(['PUT', 'DELETE','PATCH'])
 def order_update_delete(request, order_id):
     try:
         order = Order.objects.get(id=order_id)
     except Order.DoesNotExist:
         return Response({'error': 'Order not found'}, status=404)
-
-    if request.method == 'PUT':
+    
+    
+    if request.method in ['PUT', 'PATCH']:
         serializer = OrderSerializer(order, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=400)
+    # if request.method == 'PUT':
+    #     serializer = OrderSerializer(order, data=request.data, partial=True)
+    #     if serializer.is_valid():
+    #         serializer.save()
+    #         return Response(serializer.data)
+    #     return Response(serializer.errors, status=400)
 
     elif request.method == 'DELETE':
         order.delete()
@@ -370,7 +416,8 @@ def user_orders(request, user_id):
         return Response({'error': 'User not found'}, status=404)
 
     if request.method == 'GET':
-        orders = Order.objects.filter(user=user)
+        # Fetch orders in descending order of date (LIFO)
+        orders = Order.objects.filter(user=user).order_by('-date')
         formatted_orders = []
         for order in orders:
             products = [
@@ -386,7 +433,7 @@ def user_orders(request, user_id):
                 "id": order.id,
                 "products": products,
                 "totalAmount": order.total_amount,
-                "date": order.date.isoformat(),  # Properly formatted date field
+                "date": order.date.isoformat(),
                 "status": order.status,
                 "address": order.address,
                 "paymentMethod": order.payment_method
@@ -437,9 +484,157 @@ def user_orders(request, user_id):
                 for item in order.orderitem_set.all()
             ],
             "totalAmount": order.total_amount,
-            "date": order.date.isoformat(),  # Properly formatted date field
+            "date": order.date.isoformat(),
             "status": order.status,
             "address": order.address,
             "paymentMethod": order.payment_method
         }, status=201)
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# from django.shortcuts import render, get_object_or_404, redirect
+# from django.http import JsonResponse
+# from .models import (
+#     UserCustomer, Product, ProductImage, Review, Cart,
+#     Order, Wishlist, OrderItem
+# )
+
+# # -------------------- Product Detail Views --------------------
+
+# def product_detail(request, product_id):
+#     product = get_object_or_404(Product, id=product_id)
+#     images = ProductImage.objects.filter(product=product)
+#     reviews = Review.objects.filter(product=product).select_related('user')
+    
+#     # Calculate average rating
+#     avg_rating = 0
+#     if reviews:
+#         avg_rating = sum([r.rating for r in reviews]) / len(reviews)
+    
+#     context = {
+#         'product': product,
+#         'images': images,
+#         'reviews': reviews,
+#         'avg_rating': round(avg_rating, 1),
+#         'review_count': len(reviews),
+#     }
+#     return render(request, 'ecommerce/product_detail.html', context)
+
+# def product_list(request):
+#     products = Product.objects.all().prefetch_related('images')
+    
+#     # Add average rating to each product
+#     for product in products:
+#         reviews = Review.objects.filter(product=product)
+#         if reviews:
+#             product.avg_rating = round(sum([r.rating for r in reviews]) / len(reviews), 1)
+#         else:
+#             product.avg_rating = 0
+#         product.review_count = len(reviews)
+    
+#     context = {
+#         'products': products,
+#         'categories': Product.objects.values_list('category', flat=True).distinct(),
+#         'brands': Product.objects.values_list('brand', flat=True).distinct(),
+#     }
+#     return render(request, 'ecommerce/product_list.html', context)
+
+# def update_product(request, product_id):
+#     product = get_object_or_404(Product, id=product_id)
+    
+#     if request.method == 'POST':
+#         product.name = request.POST.get('name', product.name)
+#         product.price = request.POST.get('price', product.price)
+#         product.description = request.POST.get('description', product.description)
+#         product.category = request.POST.get('category', product.category)
+#         product.brand = request.POST.get('brand', product.brand)
+#         product.stock = request.POST.get('stock', product.stock)
+#         product.featured = 'featured' in request.POST
+#         product.trending = 'trending' in request.POST
+#         product.save()
+        
+#         # Handle images
+#         if 'images' in request.FILES:
+#             ProductImage.objects.filter(product=product).delete()
+#             for image in request.FILES.getlist('images'):
+#                 ProductImage.objects.create(product=product, image_url=image)
+        
+#         return redirect('product_detail', product_id=product.id)
+    
+#     images = ProductImage.objects.filter(product=product)
+#     context = {
+#         'product': product,
+#         'images': images,
+#     }
+#     return render(request, 'ecommerce/update_product.html', context)
+
+# # -------------------- Order Detail Views --------------------
+
+# def order_detail(request, order_id):
+#     order = get_object_or_404(Order, id=order_id)
+#     items = OrderItem.objects.filter(order=order).select_related('product')
+#     user = order.user
+    
+#     context = {
+#         'order': order,
+#         'items': items,
+#         'user': user,
+#     }
+#     return render(request, 'ecommerce/order_detail.html', context)
+
+# def order_list(request):
+#     orders = Order.objects.all().select_related('user').prefetch_related('orderitem_set__product')
+    
+#     context = {
+#         'orders': orders,
+#     }
+#     return render(request, 'ecommerce/order_list.html', context)
+
+# def update_order(request, order_id):
+#     order = get_object_or_404(Order, id=order_id)
+    
+#     if request.method == 'POST':
+#         order.status = request.POST.get('status', order.status)
+#         order.address = request.POST.get('address', order.address)
+#         order.payment_method = request.POST.get('payment_method', order.payment_method)
+#         order.save()
+        
+#         # Update order items
+#         for item in order.orderitem_set.all():
+#             quantity_key = f'quantity_{item.id}'
+#             if quantity_key in request.POST:
+#                 item.quantity = request.POST[quantity_key]
+#                 item.save()
+        
+#         return redirect('order_detail', order_id=order.id)
+    
+#     items = order.orderitem_set.all().select_related('product')
+#     context = {
+#         'order': order,
+#         'items': items,
+#         'status_choices': ['pending', 'shipped', 'delivered'],
+#     }
+#     return render(request, 'ecommerce/update_order.html', context)
